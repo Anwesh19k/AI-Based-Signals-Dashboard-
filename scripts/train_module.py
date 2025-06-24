@@ -39,6 +39,7 @@ def fetch_forex(symbol, interval='1h', limit=2000):
         r = requests.get(url, timeout=15)
         d = r.json()
         if "values" not in d:
+            print(f"{symbol}: API error: {d.get('message', r.text)}")
             return pd.DataFrame()
         df = pd.DataFrame(d["values"])
         df = df.astype({'open': float, 'high': float, 'low': float, 'close': float})
@@ -48,7 +49,7 @@ def fetch_forex(symbol, interval='1h', limit=2000):
         df['spread'] = (df['high'] - df['low']) / df['close']
         return df
     except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
+        print(f"{symbol}: Exception: {e}")
         return pd.DataFrame()
 
 def fetch_binance(symbol, interval='1h', limit=2000):
@@ -58,6 +59,7 @@ def fetch_binance(symbol, interval='1h', limit=2000):
         r = requests.get(url, timeout=15)
         data = r.json()
         if not isinstance(data, list) or len(data) == 0:
+            print(f"{symbol}: API error (Binance): {r.text}")
             return pd.DataFrame()
         df = pd.DataFrame(data, columns=[
             'open_time','open','high','low','close','volume','close_time','qav',
@@ -72,7 +74,7 @@ def fetch_binance(symbol, interval='1h', limit=2000):
         df['spread'] = (df['high'] - df['low']) / df['close']
         return df[['datetime', 'open', 'high', 'low', 'close', 'volume', 'spread']]
     except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
+        print(f"{symbol}: Exception: {e}")
         return pd.DataFrame()
 
 def add_features(df, hold_ahead=4, return_threshold=0.0007):
@@ -129,9 +131,10 @@ def train_model(kind='forex'):
     status_list = []
     if kind in ['forex', 'both']:
         for symbol in FOREX_SYMBOLS:
+            print(f"Training {symbol} ...")
             df = fetch_forex(symbol)
             if df.empty or len(df) < 200:
-                status_list.append(f"{symbol}: Not enough data")
+                status_list.append(f"{symbol}: Not enough data or API issue.")
                 continue
             df = add_features(df)
             if len(df['label'].unique()) < 2:
@@ -152,9 +155,10 @@ def train_model(kind='forex'):
             status_list.append(f"{symbol}: Trained, CV Acc: {rf_cv:.2%}")
     if kind in ['crypto', 'both']:
         for symbol in CRYPTO_SYMBOLS:
+            print(f"Training {symbol} ...")
             df = fetch_binance(symbol)
             if df.empty or len(df) < 200:
-                status_list.append(f"{symbol}: Not enough data")
+                status_list.append(f"{symbol}: Not enough data or API issue.")
                 continue
             df = add_features(df)
             if len(df['label'].unique()) < 2:
