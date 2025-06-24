@@ -6,11 +6,10 @@ from ta.momentum import RSIIndicator
 from ta.trend import MACD, CCIIndicator, ADXIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit
 
-API_KEYS =  [
+API_KEYS = [
     '54a7479bdf2040d3a35d6b3ae6457f9d',
     'd162b35754ca4c54a13ebe7abecab4e0',
     'a7266b2503fd497496d47527a7e63b5d',
@@ -101,7 +100,6 @@ def add_features(df, hold_ahead=4, return_threshold=0.0007):
     df['hour'] = df['datetime'].dt.hour
     df['is_london'] = ((df['hour'] >= 7) & (df['hour'] <= 15)).astype(int)
     df['is_ny'] = ((df['hour'] >= 12) & (df['hour'] <= 20)).astype(int)
-    # Binary label (BUY/UP = 1, SELL/DOWN = 0)
     df['future_close'] = df['close'].shift(-hold_ahead)
     df['future_ret'] = (df['future_close'] - df['close']) / df['close']
     df['label'] = (df['future_ret'] > return_threshold).astype(int)
