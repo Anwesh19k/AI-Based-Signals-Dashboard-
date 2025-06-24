@@ -10,9 +10,12 @@ from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit
 
-API_KEYS = [
-    'YOUR_API_KEY_1',  # <-- replace!
-    # Add more if available
+API_KEYS =  [
+    '54a7479bdf2040d3a35d6b3ae6457f9d',
+    'd162b35754ca4c54a13ebe7abecab4e0',
+    'a7266b2503fd497496d47527a7e63b5d',
+    '09c09d58ed5e4cf4afd9a9cac8e09b5d',
+    'df00920c02c54a59a426948a47095543'
 ]
 api_index = 0
 MODEL_DIR = "model"
