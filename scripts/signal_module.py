@@ -6,7 +6,7 @@ from ta.momentum import RSIIndicator
 from ta.trend import MACD, CCIIndicator, ADXIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 
-API_KEYS =  [
+API_KEYS = [
     '54a7479bdf2040d3a35d6b3ae6457f9d',
     'd162b35754ca4c54a13ebe7abecab4e0',
     'a7266b2503fd497496d47527a7e63b5d',
@@ -101,4 +101,66 @@ def add_features(df):
 def generate_signals(kind='forex'):
     features = [
         'close','rsi','macd','cci','adx','atr','boll_high','boll_low',
-        'ma5','ma20','momentum','volatility','rolling_max','rolling
+        'ma5','ma20','momentum','volatility','rolling_max','rolling_min','zscore','spread',
+        'log_ret','vol_5','vol_10','pos_in_range','is_london','is_ny'
+    ]
+    results = []
+    if kind in ['forex', 'both']:
+        for symbol in FOREX_SYMBOLS:
+            symbol_key = symbol.replace('/','')
+            df = fetch_forex(symbol)
+            df = add_features(df)
+            if df.empty or len(df) < 50:
+                results.append({
+                    "SYMBOL": symbol, "SIGNAL": "No data"
+                })
+                continue
+            try:
+                X = df[features].values
+                rf = joblib.load(os.path.join(MODEL_DIR, f"{symbol_key}_rf.joblib"))
+                scaler = joblib.load(os.path.join(MODEL_DIR, f"{symbol_key}_scaler.joblib"))
+                with open(os.path.join(MODEL_DIR, f"{symbol_key}_rf_cv.txt")) as f:
+                    acc = float(f.read().strip())
+                X_scaled = scaler.transform(X)
+                proba = rf.predict_proba(X_scaled)[-1]
+                signal = "BUY 📈" if np.argmax(proba) == 1 else "SELL 🔻"
+                conf = proba[np.argmax(proba)]
+                results.append({
+                    "SYMBOL": symbol,
+                    "SIGNAL": signal,
+                    "CONFIDENCE": f"{conf:.2f}",
+                    "CLASS PROBABILITIES": f"SELL 🔻: {proba[0]:.2f} / BUY 📈: {proba[1]:.2f}",
+                    "MODEL ACCURACY": f"{acc:.2%}",
+                    "LAST PRICE": f"{df['close'].iloc[-1]:.4f}",
+                })
+            except Exception as e:
+                results.append({"SYMBOL": symbol, "SIGNAL": f"Error: {str(e)}"})
+    if kind in ['crypto', 'both']:
+        for symbol in CRYPTO_SYMBOLS:
+            df = fetch_binance(symbol)
+            if df.empty or len(df) < 50:
+                results.append({
+                    "SYMBOL": symbol, "SIGNAL": "No data"
+                })
+                continue
+            try:
+                X = df[features].values
+                rf = joblib.load(os.path.join(MODEL_DIR, f"{symbol}_rf.joblib"))
+                scaler = joblib.load(os.path.join(MODEL_DIR, f"{symbol}_scaler.joblib"))
+                with open(os.path.join(MODEL_DIR, f"{symbol}_rf_cv.txt")) as f:
+                    acc = float(f.read().strip())
+                X_scaled = scaler.transform(X)
+                proba = rf.predict_proba(X_scaled)[-1]
+                signal = "BUY 📈" if np.argmax(proba) == 1 else "SELL 🔻"
+                conf = proba[np.argmax(proba)]
+                results.append({
+                    "SYMBOL": symbol,
+                    "SIGNAL": signal,
+                    "CONFIDENCE": f"{conf:.2f}",
+                    "CLASS PROBABILITIES": f"SELL 🔻: {proba[0]:.2f} / BUY 📈: {proba[1]:.2f}",
+                    "MODEL ACCURACY": f"{acc:.2%}",
+                    "LAST PRICE": f"{df['close'].iloc[-1]:.4f}",
+                })
+            except Exception as e:
+                results.append({"SYMBOL": symbol, "SIGNAL": f"Error: {str(e)}"})
+    return pd.DataFrame(results)
