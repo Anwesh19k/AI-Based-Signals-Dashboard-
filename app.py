@@ -1,42 +1,50 @@
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 import pandas as pd
-from datetime import datetime, timedelta
-import time
 import os
-from scripts.train_module import train_model
-from scripts.signal_module import generate_signals
+from datetime import datetime, timedelta
+
+# --- Auto-refresh for candle timer ---
+st_autorefresh(interval=1000, key="candle_timer_refresh")
 
 st.set_page_config(page_title="AI Signal Dashboard", layout="wide")
 
-MODEL_DIR = "model"
-os.makedirs(MODEL_DIR, exist_ok=True)
-
 st.title("📊 AI-powered Forex & Crypto Signal Dashboard")
 
-# Candle Counter
-interval_sec = 3600  # 1h candle, change to 60 for 1min, 300 for 5min
-
-def time_until_next_candle(interval=interval_sec):
+# --- Live 1-hour Candle Timer ---
+st.sidebar.header("🕒 1-Hour Candle Timer")
+def seconds_to_next_hour():
     now = datetime.utcnow()
-    epoch = int(now.timestamp())
-    next_epoch = (epoch // interval + 1) * interval
-    return next_epoch - epoch
+    next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    secs_left = int((next_hour - now).total_seconds())
+    return secs_left
 
-st.sidebar.header("🕒 Candle Timer")
-candle_time = st.sidebar.empty()
-while True:
-    left = time_until_next_candle(interval_sec)
-    mins, secs = divmod(int(left), 60)
-    candle_time.metric("Time to Next Candle", f"{mins:02d}:{secs:02d} UTC")
-    time.sleep(1)
-    break  # Important: Streamlit reruns, don't block forever!
+secs_left = seconds_to_next_hour()
+mins, secs = divmod(secs_left, 60)
+st.sidebar.markdown(
+    f"""
+    <div style="font-size:2.5em; font-weight:bold; text-align:center; color:#16d">
+        {mins:02d}:{secs:02d} (UTC)
+    </div>
+    <div style="text-align:center;">until next H1 candle</div>
+    """,
+    unsafe_allow_html=True
+)
 
-# User Controls
+# --- User Controls ---
 st.header("🔧 Model Actions")
-
 model_type = st.radio("What do you want to train/generate?", ["Forex", "Crypto", "Both"], horizontal=True)
 train_btn = st.button("Train Model")
 signal_btn = st.button("Generate Signals")
+
+# --- Import modular code ---
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+from scripts.train_module import train_model
+from scripts.signal_module import generate_signals
+
+MODEL_DIR = "model"
+os.makedirs(MODEL_DIR, exist_ok=True)
 
 if train_btn:
     with st.spinner("Training in progress..."):
@@ -46,10 +54,11 @@ if train_btn:
 if signal_btn:
     with st.spinner("Generating signals..."):
         df = generate_signals(model_type.lower())
-        if isinstance(df, pd.DataFrame):
+        if isinstance(df, pd.DataFrame) and not df.empty:
             st.dataframe(df, use_container_width=True)
             st.download_button("Download Signals CSV", df.to_csv(index=False), file_name="signals.csv")
         else:
             st.warning("No signals generated yet. Please train a model first.")
 
-st.info("Tip: Train the model first (only when you want to retrain). For new signals, just click 'Generate Signals' after every new candle.")
+st.info("Tip: Train the model first. After each new candle, click 'Generate Signals' to update.")
+
