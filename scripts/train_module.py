@@ -119,10 +119,12 @@ def walk_forward_validation(X, y, features, model, splits=5):
         X_val_scaled = scaler.transform(X_val)
         model.fit(X_train_scaled, y_train)
         score = model.score(X_val_scaled, y_val)
+        print(f"  Fold {i+1}: val acc={score:.4f}")
         scores.append(score)
     return np.mean(scores)
 
 def train_model(kind='forex'):
+    print("== TRAIN MODEL START ==")
     features = [
         'close','rsi','macd','cci','adx','atr','boll_high','boll_low',
         'ma5','ma20','momentum','volatility','rolling_max','rolling_min','zscore','spread',
@@ -131,49 +133,81 @@ def train_model(kind='forex'):
     status_list = []
     if kind in ['forex', 'both']:
         for symbol in FOREX_SYMBOLS:
-            print(f"Training {symbol} ...")
+            print(f"Fetching data for {symbol}...")
             df = fetch_forex(symbol)
+            print(f"Rows fetched: {len(df)}")
             if df.empty or len(df) < 200:
-                status_list.append(f"{symbol}: Not enough data or API issue.")
+                msg = f"{symbol}: Not enough data or API issue."
+                print(msg)
+                status_list.append(msg)
                 continue
             df = add_features(df)
+            print(f"{symbol}: Feature engineering done, rows now: {len(df)}")
             if len(df['label'].unique()) < 2:
-                status_list.append(f"{symbol}: Only one class present after feature engineering.")
+                msg = f"{symbol}: Only one class present after feature engineering."
+                print(msg)
+                status_list.append(msg)
                 continue
             X = df[features].values
             y = df['label'].values
             scaler = StandardScaler().fit(X)
             X_scaled = scaler.transform(X)
             rf = RandomForestClassifier(n_estimators=180, max_depth=10, random_state=42)
+            print(f"Training model for {symbol}...")
             rf_cv = walk_forward_validation(X, y, features, rf)
             rf.fit(X_scaled, y)
             symbol_key = symbol.replace('/','')
+            print(f"Saving model files for {symbol_key}...")
             joblib.dump(rf, os.path.join(MODEL_DIR, f"{symbol_key}_rf.joblib"))
             joblib.dump(scaler, os.path.join(MODEL_DIR, f"{symbol_key}_scaler.joblib"))
             with open(os.path.join(MODEL_DIR, f"{symbol_key}_rf_cv.txt"), "w") as f:
                 f.write(str(rf_cv))
-            status_list.append(f"{symbol}: Trained, CV Acc: {rf_cv:.2%}")
+            print(f"Files in model dir: {os.listdir(MODEL_DIR)}")
+            msg = f"{symbol}: Trained, CV Acc: {rf_cv:.2%}"
+            print(msg)
+            status_list.append(msg)
     if kind in ['crypto', 'both']:
         for symbol in CRYPTO_SYMBOLS:
-            print(f"Training {symbol} ...")
+            print(f"Fetching data for {symbol}...")
             df = fetch_binance(symbol)
+            print(f"Rows fetched: {len(df)}")
             if df.empty or len(df) < 200:
-                status_list.append(f"{symbol}: Not enough data or API issue.")
+                msg = f"{symbol}: Not enough data or API issue."
+                print(msg)
+                status_list.append(msg)
                 continue
             df = add_features(df)
+            print(f"{symbol}: Feature engineering done, rows now: {len(df)}")
             if len(df['label'].unique()) < 2:
-                status_list.append(f"{symbol}: Only one class present after feature engineering.")
+                msg = f"{symbol}: Only one class present after feature engineering."
+                print(msg)
+                status_list.append(msg)
                 continue
             X = df[features].values
             y = df['label'].values
             scaler = StandardScaler().fit(X)
             X_scaled = scaler.transform(X)
             rf = RandomForestClassifier(n_estimators=180, max_depth=10, random_state=42)
+            print(f"Training model for {symbol}...")
             rf_cv = walk_forward_validation(X, y, features, rf)
             rf.fit(X_scaled, y)
+            print(f"Saving model files for {symbol}...")
             joblib.dump(rf, os.path.join(MODEL_DIR, f"{symbol}_rf.joblib"))
             joblib.dump(scaler, os.path.join(MODEL_DIR, f"{symbol}_scaler.joblib"))
             with open(os.path.join(MODEL_DIR, f"{symbol}_rf_cv.txt"), "w") as f:
                 f.write(str(rf_cv))
-            status_list.append(f"{symbol}: Trained, CV Acc: {rf_cv:.2%}")
+            print(f"Files in model dir: {os.listdir(MODEL_DIR)}")
+            msg = f"{symbol}: Trained, CV Acc: {rf_cv:.2%}"
+            print(msg)
+            status_list.append(msg)
+
+    # Try to create a dummy file for testing write access:
+    try:
+        with open(os.path.join(MODEL_DIR, "testfile.txt"), "w") as f:
+            f.write("This is a test file.")
+        print("Dummy file testfile.txt created.")
+    except Exception as e:
+        print(f"Failed to create dummy file in model dir: {e}")
+
+    print("== TRAIN MODEL END ==")
     return "\n".join(status_list)
